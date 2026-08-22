@@ -1,0 +1,25 @@
+name: women_safety_app
+description: A women's safety app with SOS alerts, live location tracking, and trusted emergency contacts.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  geolocator: ^11.0.0        # get device GPS location
+  url_launcher: ^6.2.5       # send SMS / make calls to emergency contacts
+  shared_preferences: ^2.2.2 # store contacts & profile locally
+  permission_handler: ^11.3.0 # request location/SMS permissions
+  intl: ^0.19.0              # date/time formatting
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
