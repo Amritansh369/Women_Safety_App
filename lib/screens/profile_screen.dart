@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/shake_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import 'login_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -11,10 +13,11 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final _storage = StorageService();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _bloodGroupCtrl = TextEditingController();
+  String? _bloodGroup;
   bool _loading = true;
   bool _saving = false;
 
@@ -28,8 +31,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profile = await _storage.getProfile();
     _nameCtrl.text = profile['name'] ?? '';
     _phoneCtrl.text = profile['phone'] ?? '';
-    _bloodGroupCtrl.text = profile['bloodGroup'] ?? '';
-    setState(() => _loading = false);
+    final bloodGroup = profile['bloodGroup'] ?? '';
+    if (!mounted) return;
+    setState(() {
+      _bloodGroup = _bloodGroups.contains(bloodGroup) ? bloodGroup : null;
+      _loading = false;
+    });
   }
 
   Future<void> _save() async {
@@ -37,15 +44,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _storage.saveProfile(
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
-      bloodGroup: _bloodGroupCtrl.text.trim(),
+      bloodGroup: _bloodGroup ?? '',
     );
-    setState(() => _saving = false);
     if (!mounted) return;
+    setState(() => _saving = false);
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Profile saved')));
   }
 
   Future<void> _logout() async {
+    await ShakeService.instance.stop();
     await _storage.setLoggedIn(false);
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -58,7 +66,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _bloodGroupCtrl.dispose();
     super.dispose();
   }
 
@@ -88,8 +95,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 28),
                   TextField(
                     controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
                         labelText: 'Full Name',
+                        helperText: 'Your contacts see this in SOS alerts',
                         prefixIcon: Icon(Icons.person_outline)),
                   ),
                   const SizedBox(height: 14),
@@ -101,11 +110,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         prefixIcon: Icon(Icons.phone_outlined)),
                   ),
                   const SizedBox(height: 14),
-                  TextField(
-                    controller: _bloodGroupCtrl,
+                  DropdownButtonFormField<String>(
+                    initialValue: _bloodGroup,
                     decoration: const InputDecoration(
-                        labelText: 'Blood Group (for emergencies)',
+                        labelText: 'Blood Group',
+                        helperText: 'Included in SOS alerts for responders',
                         prefixIcon: Icon(Icons.bloodtype_outlined)),
+                    items: [
+                      for (final group in _bloodGroups)
+                        DropdownMenuItem(value: group, child: Text(group)),
+                    ],
+                    onChanged: (value) => setState(() => _bloodGroup = value),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -114,9 +129,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2))
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Save Changes'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.tune),
+                    label: const Text('Safety Settings'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
@@ -125,7 +150,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     label: const Text('Logout',
                         style: TextStyle(color: AppColors.sosRed)),
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 52),
                       side: const BorderSide(color: AppColors.sosRed),
                     ),
                   ),

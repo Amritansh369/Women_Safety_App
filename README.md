@@ -1,78 +1,98 @@
-# Women Safety App (Flutter)
+# SafeHer
 
-A Flutter app matching the feature spec:
+A personal safety app built with Flutter. It works without a backend or a paid
+SMS gateway: everything runs on the phone, using GPS and the SIM's own SMS.
+
+## Features
 
 | Feature | What it does |
 |---|---|
-| **Login** | Simple phone/password login screen, session persisted locally |
-| **Home** | Big SOS button + quick-access cards to every feature |
-| **SOS** | One-tap emergency alert: grabs live GPS location and sends it via SMS to all trusted contacts |
-| **Live Tracking** | Streams the user's live coordinates and lets them open/share their position on Google Maps |
-| **Emergency Contacts** | Add / edit / delete trusted contacts, call them directly |
-| **Profile** | Name, phone, blood group, logout |
+| **SOS** | Press and hold, or shake. After a cancellable countdown, your location goes to every trusted contact by SMS, with no further taps on Android |
+| **Honest status** | Shows per contact whether the network accepted the alert, with retry. Never says "sent" unless it was |
+| **Live updates** | While an SOS runs, location updates continue by SMS with the screen off, until you hold "I'm safe", which also tells your contacts |
+| **Safe Walk** | Set a time for a journey. Miss it, ignore the loud check-in, and the SOS fires by itself |
+| **Fake Call** | A realistic incoming call to help you leave an uncomfortable situation |
+| **Siren** | Loud alarm on the alarm stream. Off by default, because it isn't safe in every situation |
+| **Live Location** | In-app OpenStreetMap view, with sharing through any app |
+| **Safety Check** | Shows what an SOS needs (contacts, permissions, GPS) and fixes each gap |
+| **Contacts** | Add, edit, remove, call, and send a test alert |
+| **Helplines** | One-tap Indian national helplines |
+| **History** | On-device log of past alerts |
+| **Safety Tips**, dark mode, screen reader support | |
+
+## How the SOS works
+
+`EmergencyController` is the core of the app, and follows two rules: nothing may
+stop the alert going out, and the status shown is what actually happened.
+
+1. Hold the button (or shake) to start the countdown. Cancelling sends nothing.
+2. It tries for a fresh GPS fix for up to 8 seconds, then falls back to the last
+   known position (labelled as such), and then to no position at all. A missing
+   fix never blocks the alert. When a real fix arrives, a follow-up goes out.
+3. Each contact is sent to concurrently and retried up to twice, so one bad
+   number can't delay the others.
+4. On Android the SMS goes straight out through `SmsManager`
+   (`MainActivity.kt`), and only counts as sent once the radio reports success.
+   Without the SMS permission, and always on iOS (which doesn't allow it), the
+   messaging app opens pre-filled and the screen says the user must press send.
+5. Failed alerts retry every 30 seconds for as long as the SOS runs, because
+   lost signal is often temporary and the user may not be able to tap Retry.
+6. Updates keep going with the phone locked or the app swiped away. On Android,
+   `SafetyForegroundService` keeps the process alive and `MainActivity` keeps one
+   Flutter engine for the life of the process, so Dart outlives the screen.
+7. If the process is killed anyway, or the phone restarts, the SOS resumes on
+   next launch without alerting everyone again.
 
 ## Project structure
+
 ```
 lib/
-  main.dart                  # entry point, routes to Login or Home based on session
-  theme.dart                 # colors & Material theme
-  models/
-    emergency_contact.dart
+  main.dart                     entry point, shows SOS screens above every route
+  theme.dart                    colors, light & dark themes
+  models/                       contacts, incidents, settings, location fixes
   services/
-    storage_service.dart     # SharedPreferences persistence (contacts, profile, session)
-    location_service.dart    # geolocator wrapper (permissions + current/live position)
-    sos_service.dart         # builds SOS message + opens SMS/phone app
-  screens/
-    login_screen.dart
-    home_screen.dart
-    sos_screen.dart
-    tracking_screen.dart
-    contacts_screen.dart
-    profile_screen.dart
-pubspec.yaml
+    emergency_controller.dart   the SOS state machine
+    safe_walk_controller.dart   the Safe Walk dead-man's switch
+    sms_service.dart            direct SMS and composer fallback
+    location_service.dart       GPS, permissions, background location
+    shake_service.dart          shake detection
+    readiness_service.dart      checks that an SOS would work
+    sos_service.dart            the text of every message
+    auth_service.dart           local account, PBKDF2 password hash
+    siren_service.dart          alarm-stream audio
+    storage_service.dart        SharedPreferences persistence
+  screens/                      one file per screen
+  widgets/                      hold-to-confirm button, live map
+android/app/src/main/kotlin/    native SMS sender and foreground service
+assets/audio/                   siren and ringtone
+test/                           unit and widget tests
 ```
 
-## Getting started
+## Running it
 
-1. **Install Flutter** (if you haven't): https://docs.flutter.dev/get-started/install
-2. **Create/copy the project**, then install dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. **Run it**:
-   ```bash
-   flutter run
-   ```
-
-## Required native permissions
-
-### Android — `android/app/src/main/AndroidManifest.xml`
-Add inside `<manifest>`, before `<application>`:
-```xml
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-<uses-permission android:name="android.permission.SEND_SMS"/>
-<uses-permission android:name="android.permission.CALL_PHONE"/>
-<uses-permission android:name="android.permission.INTERNET"/>
+```bash
+flutter pub get
+flutter test
+flutter run
 ```
 
-### iOS — `ios/Runner/Info.plist`
-Add these keys:
-```xml
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>We need your location to send it to your emergency contacts during an SOS.</string>
-<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-<string>We need your location to send it to your emergency contacts during an SOS.</string>
-```
+## Limits to know about
 
-## How the SOS flow works
-1. User taps the SOS button on Home or the dedicated SOS screen.
-2. `LocationService` fetches the current GPS position (requesting permission if needed).
-3. `SosService` builds a message containing a Google Maps link to that position.
-4. The device's native SMS app opens, pre-addressed to every saved emergency contact, with the message pre-filled — the user just taps send (this keeps it free, and avoids needing a paid SMS gateway or backend server).
-
-## Notes & next steps for production
-- **Login** here is a local-only placeholder. Swap in real authentication (Firebase Auth, or your own backend) before shipping.
-- **Auto-send SMS** without the user tapping "send" requires either a native platform channel (Android `SmsManager`) or a backend + Twilio-style SMS API — the `sms:` URL scheme used here always opens the messaging app for the user to confirm, which is the safest cross-platform default.
-- **Live Tracking** currently shows raw coordinates + a "open in Maps" link. For an in-app map view, add `google_maps_flutter` and feed it the same `LocationService.watchLocation()` stream as a marker.
-- Consider adding: shake-to-SOS gesture, a countdown/cancel timer before sending (to avoid accidental alerts), and background location sharing during an active emergency.
+- **Automatic SMS is Android only.** iOS requires the user to press send.
+- **Google Play restricts `SEND_SMS`.** Publishing needs a permissions
+  declaration, which Google may refuse. Installing the APK directly is unaffected.
+- **Before a store release:** change the `com.example` application ID, set up
+  release signing, and move off the public OpenStreetMap tile server, whose usage
+  policy doesn't allow heavy production traffic.
+- **Contacts get snapshots, not a live map.** Following a moving position
+  remotely needs a server, so contacts get a link in each SMS update.
+- **Background running isn't guaranteed everywhere.** Some manufacturers' battery
+  savers kill foreground services, so test on your phone, and exempt the app from
+  battery optimisation. A phone restart ends protection until the app is reopened.
+- **Background protection needs location permission.** Android refuses this kind
+  of service without it.
+- **Login is local.** It keeps casual users out of the app, but the account only
+  exists on the phone.
+- **Emergency SMS needs mobile signal.** The app can't help with no coverage.
+- SafeHer is a tool to help alert people you trust. It doesn't replace emergency
+  services.
