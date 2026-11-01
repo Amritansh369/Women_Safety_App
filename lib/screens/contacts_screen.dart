@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
 import '../models/emergency_contact.dart';
 import '../services/sms_service.dart';
 import '../services/sos_service.dart';
@@ -12,6 +14,17 @@ String? cleanPhoneNumber(String input) {
   final digits = trimmed.replaceAll(RegExp(r'\D'), '');
   if (digits.length < 7 || digits.length > 15) return null;
   return trimmed.startsWith('+') ? '+$digits' : digits;
+}
+
+/// True when two numbers reach the same phone, however they're written:
+/// +91 98000 00001 and 098000 00001 differ only in their prefix.
+bool isSameNumber(String a, String b) {
+  String lastDigits(String number) {
+    final digits = number.replaceAll(RegExp(r'\D'), '');
+    return digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+  }
+
+  return lastDigits(a) == lastDigits(b);
 }
 
 class ContactsScreen extends StatefulWidget {
@@ -45,7 +58,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _addOrEditContact({EmergencyContact? existing}) async {
     final contact = await showDialog<EmergencyContact>(
       context: context,
-      builder: (_) => _ContactDialog(existing: existing),
+      builder: (_) => _ContactDialog(
+        existing: existing,
+        otherPhones: [
+          for (final c in _contacts)
+            if (c.id != existing?.id) c.phone,
+        ],
+      ),
     );
     if (contact == null) return;
     setState(() {
@@ -221,7 +240,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
 class _ContactDialog extends StatefulWidget {
   final EmergencyContact? existing;
-  const _ContactDialog({this.existing});
+  final List<String> otherPhones;
+  const _ContactDialog({this.existing, required this.otherPhones});
 
   @override
   State<_ContactDialog> createState() => _ContactDialogState();
@@ -233,6 +253,38 @@ class _ContactDialogState extends State<_ContactDialog> {
   late final _phoneCtrl = TextEditingController(text: widget.existing?.phone);
   late final _relationCtrl =
       TextEditingController(text: widget.existing?.relation);
+  String? _pickError;
+
+  /// Uses the phone's own contact picker, which hands over only the person
+  /// chosen, so the app never needs permission to read the contact list.
+  Future<void> _pickFromPhone() async {
+    setState(() => _pickError = null);
+    try {
+      final picked = await FlutterNativeContactPicker().selectPhoneNumber();
+      if (picked == null || !mounted) return;
+      final number = picked.selectedPhoneNumber ?? '';
+      setState(() {
+        _nameCtrl.text = picked.fullName ?? '';
+        _phoneCtrl.text = cleanPhoneNumber(number) ?? number;
+      });
+      _formKey.currentState!.validate();
+    } on PlatformException catch (e) {
+      debugPrint('Contact picker failed: ${e.message}');
+      if (mounted) {
+        setState(() => _pickError = "Couldn't open your contacts. Type the "
+            'details instead.');
+      }
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    final phone = cleanPhoneNumber(value ?? '');
+    if (phone == null) return 'Enter a valid phone number';
+    if (widget.otherPhones.any((other) => isSameNumber(other, phone))) {
+      return 'This number is already in your contacts';
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -267,6 +319,20 @@ class _ContactDialogState extends State<_ContactDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              OutlinedButton.icon(
+                onPressed: _pickFromPhone,
+                icon: const Icon(Icons.contacts),
+                label: const Text('Choose from phone contacts'),
+              ),
+              if (_pickError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _pickError!,
+                    style: const TextStyle(color: AppColors.sosRed),
+                  ),
+                ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _nameCtrl,
                 textCapitalization: TextCapitalization.words,
@@ -279,9 +345,7 @@ class _ContactDialogState extends State<_ContactDialog> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(labelText: 'Phone number'),
-                validator: (v) => cleanPhoneNumber(v ?? '') == null
-                    ? 'Enter a valid phone number'
-                    : null,
+                validator: _validatePhone,
               ),
               const SizedBox(height: 10),
               TextFormField(

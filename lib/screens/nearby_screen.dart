@@ -12,7 +12,9 @@ import 'helplines_screen.dart';
 /// Police stations and hospitals around the user. The last search is kept on
 /// the phone, so the list still works with no signal.
 class NearbyScreen extends StatefulWidget {
-  const NearbyScreen({super.key});
+  final NearbyService? service;
+  final Future<LocationFix?> Function()? locate;
+  const NearbyScreen({super.key, this.service, this.locate});
 
   @override
   State<NearbyScreen> createState() => _NearbyScreenState();
@@ -20,10 +22,11 @@ class NearbyScreen extends StatefulWidget {
 
 class _NearbyScreenState extends State<NearbyScreen> {
   static const _maxPlaces = 30;
-  final _service = NearbyService();
+  late final _service = widget.service ?? NearbyService();
   NearbyResult? _result;
   LocationFix? _fix;
   bool _loading = true;
+  String _status = 'Finding your location...';
 
   @override
   void initState() {
@@ -31,20 +34,44 @@ class _NearbyScreenState extends State<NearbyScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<LocationFix?> _locate() async {
     final location = LocationService.instance;
-    final fix = await location.currentFix(const Duration(seconds: 10)) ??
+    return await location.currentFix(const Duration(seconds: 8)) ??
         await location.lastKnown();
-    final result = fix == null
-        ? await _service.saved()
-        : await _service.find(fix.latitude, fix.longitude);
+  }
+
+  void _setStatus(String status) {
+    if (mounted) setState(() => _status = status);
+  }
+
+  /// Always ends by leaving the spinner, whatever goes wrong: an endless
+  /// spinner tells someone who needs help nothing.
+  Future<void> _load() async {
+    LocationFix? fix;
+    NearbyResult? result;
+    try {
+      fix = await (widget.locate ?? _locate)();
+      _setStatus('Searching for help nearby...');
+      result = fix == null
+          ? await _service.saved()
+          : await _service.find(fix.latitude, fix.longitude);
+    } catch (e) {
+      debugPrint('Nearby Help failed: $e');
+    }
     if (!mounted) return;
     setState(() {
       _fix = fix;
       _result = result;
       _loading = false;
     });
+  }
+
+  void _retry() {
+    setState(() {
+      _loading = true;
+      _status = 'Finding your location...';
+    });
+    _load();
   }
 
   @override
@@ -56,14 +83,23 @@ class _NearbyScreenState extends State<NearbyScreen> {
         actions: [
           IconButton(
             tooltip: 'Search again',
-            onPressed: _loading ? null : _load,
+            onPressed: _loading ? null : _retry,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(_status),
+                  ],
+                ),
+              )
             : result == null
                 ? _nothingToShow()
                 : _list(result),
@@ -86,7 +122,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: _load, child: const Text('Try again')),
+            ElevatedButton(onPressed: _retry, child: const Text('Try again')),
             const SizedBox(height: 10),
             OutlinedButton(
               onPressed: () => Navigator.pushReplacement(
@@ -143,8 +179,8 @@ class _NearbyScreenState extends State<NearbyScreen> {
           _PlaceCard(place: place, metres: metres(place)),
         const SizedBox(height: 12),
         const Text(
-          'Places come from OpenStreetMap, which your approximate location is '
-          'sent to for this search. Entries can be out of date. © OpenStreetMap '
+          'Your location is sent to a public OpenStreetMap search service for '
+          'this. Entries can be incomplete or out of date. © OpenStreetMap '
           'contributors.',
           style: TextStyle(fontSize: 12),
         ),

@@ -18,7 +18,7 @@ SMS gateway: everything runs on the phone, using GPS and the SIM's own SMS.
 | **Siren** | Loud alarm on the alarm stream. Off by default, because it isn't safe in every situation |
 | **Live Location** | In-app OpenStreetMap view, with sharing through any app |
 | **Safety Check** | From the Home status card: shows what an SOS needs (contacts, permissions, GPS) and fixes each gap |
-| **Contacts** | Add, edit, remove, call, and send a test alert |
+| **Contacts** | Choose from the phone's contacts or type them in, then edit, remove, call, or send a test alert. Uses the system picker, so the app never reads the contact list |
 | **Helplines** | One-tap Indian national helplines |
 | **History** | On-device log of past alerts |
 | **Safety Tips**, dark mode, screen reader support | |
@@ -100,8 +100,8 @@ flutter run
 - **Automatic SMS is Android only.** iOS requires the user to press send.
 - **Google Play restricts `SEND_SMS`.** Publishing needs a permissions
   declaration, which Google may refuse. Installing the APK directly is unaffected.
-- **Before a store release:** move off the public OpenStreetMap tile and Overpass
-  servers, whose usage policies don't allow heavy production traffic.
+- **Before a store release:** move off the public OpenStreetMap tile, Nominatim
+  and Photon servers, whose usage policies don't allow heavy production traffic.
 - **Delivery reports depend on the carrier.** No report doesn't mean the alert
   failed, so such contacts stay at "Sent".
 - **Contacts reached through the messaging app** only get updates when the user

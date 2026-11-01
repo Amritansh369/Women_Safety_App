@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:clock/clock.dart';
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -9,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:women_safety_app/models/app_settings.dart';
 import 'package:women_safety_app/models/incident.dart';
 import 'package:women_safety_app/models/location_fix.dart';
+import 'package:women_safety_app/screens/nearby_screen.dart';
 import 'package:women_safety_app/services/emergency_controller.dart';
 import 'package:women_safety_app/services/nearby_service.dart';
 import 'package:women_safety_app/services/safe_walk_controller.dart';
@@ -337,61 +339,125 @@ void main() {
   });
 
   group('Nearby Help', () {
-    const body = '''
-{"elements":[
- {"type":"node","lat":12.97,"lon":77.59,
-  "tags":{"amenity":"police","name":"MG Road Police","phone":"080 1234; 080 5678"}},
- {"type":"way","center":{"lat":12.98,"lon":77.60},
-  "tags":{"amenity":"hospital","name":"City Hospital"}},
- {"type":"node","lat":12.99,"lon":77.61,"tags":{"amenity":"hospital"}},
- {"type":"relation","tags":{"amenity":"police","name":"No position"}}
-]}''';
+    const police = '''
+[{"name":"MG Road Police","lat":"12.97","lon":"77.59",
+  "extratags":{"phone":"080 1234; 080 5678"}},
+ {"name":"","lat":"12.98","lon":"77.60","extratags":null}]''';
+    const hospital = '''
+[{"name":"City Hospital","lat":"12.98","lon":"77.60","extratags":null}]''';
+    const photon = '''
+{"features":[
+ {"geometry":{"coordinates":[77.6,12.98]},"properties":{"name":"Photon Place"}},
+ {"geometry":{"coordinates":[77.7,12.99]},"properties":{}}]}''';
 
-    test('reads nodes and ways, and skips unusable entries', () {
-      final places = NearbyService.parseOverpass(body);
-      expect(places.map((p) => p.name), ['MG Road Police', 'City Hospital']);
-      expect(places.first.kind, PlaceKind.police);
-      expect(places.first.phone, '080 1234');
-      expect(places.last.kind, PlaceKind.hospital);
-      expect(places.last.latitude, 12.98);
+    http.Response nominatimReply(http.Request request) => http.Response(
+          request.url.queryParameters['amenity'] == 'police' ? police : hospital,
+          200,
+        );
+
+    NearbyService service(MockClientHandler handler) => NearbyService(
+          client: MockClient(handler),
+          politeDelay: Duration.zero,
+        );
+
+    test('reads results, and skips unnamed entries', () {
+      final places = NearbyService.parseNominatim(police, PlaceKind.police);
+      expect(places.map((p) => p.name), ['MG Road Police']);
+      expect(places.single.phone, '080 1234');
+      expect(places.single.latitude, 12.97);
+
+      final backup = NearbyService.parsePhoton(photon, PlaceKind.hospital);
+      expect(backup.map((p) => p.name), ['Photon Place']);
+      expect(backup.single.latitude, 12.98);
+      expect(backup.single.longitude, 77.6);
     });
 
-    test('falls back to the second server', () async {
-      final asked = <String>[];
-      final service = NearbyService(
-        client: MockClient((request) async {
-          asked.add(request.url.host);
-          return asked.length == 1
-              ? http.Response('busy', 504)
-              : http.Response(body, 200);
-        }),
-      );
-      final result = await service.find(12.97, 77.59);
-      expect(asked, hasLength(2));
-      expect(result!.places, hasLength(2));
+    test('finds police and hospitals within the search area', () async {
+      final asked = <Uri>[];
+      final result = await service((request) async {
+        asked.add(request.url);
+        return nominatimReply(request);
+      }).find(12.97, 77.59);
+
+      expect(result!.places.map((p) => p.kind),
+          [PlaceKind.police, PlaceKind.hospital]);
+      expect(result.fromCache, isFalse);
+      final box = asked.first.queryParameters['viewbox']!
+          .split(',')
+          .map(double.parse)
+          .toList();
+      expect(box[0], lessThan(77.59));
+      expect(box[1], greaterThan(12.97));
+      expect(box[2], greaterThan(77.59));
+      expect(box[3], lessThan(12.97));
+    });
+
+    test('uses the backup service when the first is down', () async {
+      final result = await service((request) async {
+        if (request.url.host.startsWith('nominatim')) {
+          return http.Response('down', 502);
+        }
+        return http.Response(photon, 200);
+      }).find(12.97, 77.59);
+      expect(result!.places.map((p) => p.name).toSet(), {'Photon Place'});
       expect(result.fromCache, isFalse);
     });
 
     test('offline, shows the last saved search, marked as saved', () async {
       var online = true;
-      final service = NearbyService(
-        client: MockClient((_) async {
-          if (!online) throw http.ClientException('no signal');
-          return http.Response(body, 200);
-        }),
-      );
-      await service.find(12.97, 77.59);
+      final nearby = service((request) async {
+        if (!online) throw http.ClientException('no signal');
+        return nominatimReply(request);
+      });
+      await nearby.find(12.97, 77.59);
       online = false;
-      final result = await service.find(12.97, 77.59);
+      final result = await nearby.find(12.97, 77.59);
       expect(result!.fromCache, isTrue);
       expect(result.places, hasLength(2));
     });
 
     test('offline with nothing saved reports nothing', () async {
-      final service = NearbyService(
-        client: MockClient((_) async => throw http.ClientException('no signal')),
+      final nearby =
+          service((_) async => throw http.ClientException('no signal'));
+      expect(await nearby.find(12.97, 77.59), isNull);
+    });
+
+    test('a damaged saved search counts as nothing saved', () async {
+      SharedPreferences.setMockInitialValues({'nearby_places': '{"oops":1}'});
+      expect(await NearbyService().saved(), isNull);
+    });
+
+    testWidgets('never stays on the spinner', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: NearbyScreen(
+          service: service((_) async => throw http.ClientException('down')),
+          locate: () async => throw Exception('GPS failed'),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Try again'), findsOneWidget);
+    });
+
+    testWidgets('shows places, nearest first', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: NearbyScreen(
+          service: service((request) async => nominatimReply(request)),
+          locate: () async => LocationFix(
+            latitude: 12.98,
+            longitude: 77.60,
+            accuracy: 10,
+            time: DateTime(2026),
+          ),
+        ),
+      ));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
       );
-      expect(await service.find(12.97, 77.59), isNull);
+      await tester.pumpAndSettle();
+      final hospitalTop = tester.getTopLeft(find.text('City Hospital')).dy;
+      final policeTop = tester.getTopLeft(find.text('MG Road Police')).dy;
+      expect(hospitalTop, lessThan(policeTop));
     });
   });
 }
