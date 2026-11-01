@@ -73,6 +73,8 @@ class SafetyForegroundService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
             .setOngoing(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .addAction(SafetyNotices.sosAction(this))
             .build()
     }
 

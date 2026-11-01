@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'device_events.dart';
 
 enum SmsResult { sent, failed, noPermission, unsupported }
 
 abstract class SmsGateway {
   /// Sends without user interaction, and reports what the phone network said.
-  Future<SmsResult> send(String phone, String message);
+  /// With a [deliveryTag], that tag appears on [deliveries] if the network
+  /// later confirms the message reached the handset.
+  Future<SmsResult> send(String phone, String message, {String? deliveryTag});
+
+  Stream<String> get deliveries;
 
   /// Opens the messaging app pre-filled. The user still has to press send.
   Future<bool> openComposer(List<String> phones, String message);
@@ -22,13 +27,21 @@ class DeviceSmsGateway implements SmsGateway {
   static const _sendTimeout = Duration(seconds: 70);
 
   @override
-  Future<SmsResult> send(String phone, String message) async {
+  Stream<String> get deliveries => DeviceEvents.deliveries;
+
+  @override
+  Future<SmsResult> send(
+    String phone,
+    String message, {
+    String? deliveryTag,
+  }) async {
     if (!Platform.isAndroid) return SmsResult.unsupported;
     if (!await Permission.sms.isGranted) return SmsResult.noPermission;
     try {
       final result = await _channel.invokeMethod<String>('sendSms', {
         'phone': phone,
         'message': message,
+        'deliveryTag': deliveryTag,
       }).timeout(_sendTimeout);
       return switch (result) {
         'sent' => SmsResult.sent,

@@ -1,7 +1,7 @@
 name: women_safety_app
 description: SafeHer - a personal safety app with verified SOS alerts, live location, Safe Walk check-ins, and trusted emergency contacts.
 publish_to: 'none'
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
@@ -22,7 +22,7 @@ dependencies:
   crypto: ^3.0.8              # password hashing for the local account
   share_plus: ^13.3.1         # share location through any app
   clock: ^1.1.1               # testable wall-clock time for timers
-
+  http: ^1.6.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

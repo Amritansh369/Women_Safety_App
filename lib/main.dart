@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'app_info.dart';
+import 'services/device_events.dart';
 import 'services/emergency_controller.dart';
 import 'services/safe_walk_controller.dart';
 import 'services/storage_service.dart';
@@ -7,13 +9,26 @@ import 'screens/check_in_screen.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const SafeHerApp());
-  EmergencyController.instance.resumeIfActive();
-  SafeWalkController.instance.resumeIfActive();
+  unawaited(SafeWalkController.instance.resumeIfActive());
+  unawaited(_startServices());
+}
+
+/// A running SOS is resumed before shortcuts are listened to, so a press on the
+/// tile during startup can't be mistaken for a new SOS.
+Future<void> _startServices() async {
+  try {
+    appLanguage = (await StorageService().getSettings()).language;
+    await EmergencyController.instance.resumeIfActive();
+  } catch (e) {
+    debugPrint('Startup: $e');
+  }
+  await DeviceEvents.start();
 }
 
 class SafeHerApp extends StatelessWidget {

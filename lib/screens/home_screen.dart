@@ -6,12 +6,14 @@ import '../services/readiness_service.dart';
 import '../services/safe_walk_controller.dart';
 import '../services/shake_service.dart';
 import '../services/storage_service.dart';
+import '../strings.dart';
 import '../theme.dart';
 import '../widgets/hold_button.dart';
 import 'contacts_screen.dart';
 import 'fake_call_screen.dart';
 import 'helplines_screen.dart';
 import 'history_screen.dart';
+import 'nearby_screen.dart';
 import 'profile_screen.dart';
 import 'safe_walk_screen.dart';
 import 'setup_screen.dart';
@@ -107,10 +109,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 semanticLabel: 'Start SOS countdown',
                 onConfirmed: () => EmergencyController.instance
                     .startCountdown(IncidentTrigger.button),
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    const Text(
                       'SOS',
                       style: TextStyle(
                         color: Colors.white,
@@ -120,8 +122,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                     Text(
-                      'Press and hold',
-                      style: TextStyle(color: Colors.white, fontSize: 15),
+                      tr('Press and hold'),
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
                     ),
                   ],
                 ),
@@ -179,10 +181,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   onTap: () => _open(const HistoryScreen()),
                 ),
                 _FeatureCard(
-                  icon: Icons.tune,
-                  label: 'Safety Check',
+                  icon: Icons.near_me,
+                  label: 'Nearby Help',
                   color: AppColors.accent,
-                  onTap: () => _open(const SetupScreen()),
+                  onTap: () => _open(const NearbyScreen()),
                 ),
               ],
             ),

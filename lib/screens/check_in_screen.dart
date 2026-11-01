@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/safe_walk_controller.dart';
+import '../strings.dart';
 import '../theme.dart';
 
 /// The last chance to stop an overdue Safe Walk from turning into an SOS.
@@ -24,9 +25,9 @@ class CheckInScreen extends StatelessWidget {
                   const Spacer(),
                   const Icon(Icons.shield, color: Colors.white, size: 64),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Are you OK?',
-                    style: TextStyle(
+                  Text(
+                    tr('Are you OK?'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 34,
                       fontWeight: FontWeight.w800,
@@ -36,7 +37,9 @@ class CheckInScreen extends StatelessWidget {
                   Semantics(
                     liveRegion: true,
                     child: Text(
-                      'SOS will be sent in ${walk.remaining.inSeconds} seconds.',
+                      tr('SOS will be sent in {seconds} seconds.', {
+                        'seconds': walk.remaining.inSeconds,
+                      }),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 18),
                     ),
@@ -49,7 +52,7 @@ class CheckInScreen extends StatelessWidget {
                       foregroundColor: AppColors.primaryDark,
                       minimumSize: const Size(double.infinity, 64),
                     ),
-                    child: const Text("I'm safe", style: TextStyle(fontSize: 20)),
+                    child: Text(tr("I'm safe"), style: const TextStyle(fontSize: 20)),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
@@ -58,7 +61,7 @@ class CheckInScreen extends StatelessWidget {
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white54),
                     ),
-                    child: const Text('I need 10 more minutes'),
+                    child: Text(tr('I need 10 more minutes')),
                   ),
                 ],
               ),

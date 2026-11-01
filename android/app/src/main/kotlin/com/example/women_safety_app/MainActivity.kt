@@ -9,10 +9,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.telephony.SmsManager
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -26,6 +29,47 @@ class MainActivity : FlutterActivity() {
         // activity is destroyed; a new activity then reattaches to this engine,
         // rather than starting a second copy of the app that would alert twice.
         private var engine: FlutterEngine? = null
+        private var channel: MethodChannel? = null
+        private var current: MainActivity? = null
+        private var sosRequested = false
+
+        /** Called by SosShortcutActivity, and only by it. */
+        fun requestSos() {
+            sosRequested = true
+            current?.showOverLockScreen(true)
+        }
+
+        fun reportDelivered(tag: String) {
+            channel?.invokeMethod("smsDelivered", tag)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        if (sosRequested) showOverLockScreen(true)
+        super.onCreate(savedInstanceState)
+        current = this
+    }
+
+    override fun onDestroy() {
+        if (current === this) current = null
+        super.onDestroy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (sosRequested) channel?.invokeMethod("sosRequested", null)
+    }
+
+    private fun showOverLockScreen(show: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(show)
+            setTurnScreenOn(show)
+        } else {
+            val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            @Suppress("DEPRECATION")
+            if (show) window.addFlags(flags) else window.clearFlags(flags)
+        }
     }
 
     override fun provideFlutterEngine(context: Context): FlutterEngine {
@@ -47,14 +91,51 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "safeher/device")
-            .setMethodCallHandler { call, result ->
+        val device = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "safeher/device")
+        channel = device
+        device.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "sendSms" -> sendSms(
                         call.argument<String>("phone")!!,
                         call.argument<String>("message")!!,
+                        call.argument<String>("deliveryTag"),
                         result,
                     )
+                    "consumeSosRequest" -> {
+                        result.success(sosRequested)
+                        sosRequested = false
+                    }
+                    "leaveLockScreen" -> {
+                        showOverLockScreen(false)
+                        result.success(null)
+                    }
+                    "setQuickSos" -> {
+                        if (call.argument<Boolean>("enabled") == true) {
+                            SafetyNotices.showQuickSos(applicationContext)
+                        } else {
+                            SafetyNotices.hideQuickSos(applicationContext)
+                        }
+                        result.success(null)
+                    }
+                    "postNotice" -> {
+                        SafetyNotices.post(
+                            applicationContext,
+                            call.argument<String>("title")!!,
+                            call.argument<String>("text")!!,
+                        )
+                        result.success(null)
+                    }
+                    "batteryLevel" -> {
+                        val battery = applicationContext
+                            .getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                        result.success(
+                            if (battery.isCharging) {
+                                null
+                            } else {
+                                battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                            },
+                        )
+                    }
                     "maxAlarmVolume" -> {
                         val audio = applicationContext
                             .getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -99,7 +180,12 @@ class MainActivity : FlutterActivity() {
      * Sends one SMS (split into parts if long) and replies once the radio has
      * reported on every part, so "sent" means the network really accepted it.
      */
-    private fun sendSms(phone: String, message: String, result: MethodChannel.Result) {
+    private fun sendSms(
+        phone: String,
+        message: String,
+        deliveryTag: String?,
+        result: MethodChannel.Result,
+    ) {
         val context = applicationContext
         if (context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             result.success("no_permission")
@@ -155,9 +241,40 @@ class MainActivity : FlutterActivity() {
             },
         )
         try {
-            manager.sendMultipartTextMessage(phone, null, parts, sentIntents, null)
+            manager.sendMultipartTextMessage(
+                phone,
+                null,
+                parts,
+                sentIntents,
+                deliveryTag?.let { deliveryIntents(it, parts.size) },
+            )
         } catch (e: Exception) {
             reply("failed")
         }
+    }
+
+    // Mutable because the radio adds the report to the intent. It can't be
+    // redirected: the intent names SmsDeliveryReceiver explicitly.
+    private fun deliveryIntents(tag: String, parts: Int): ArrayList<PendingIntent> {
+        val context = applicationContext
+        val sendId = UUID.randomUUID().toString()
+        val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
+        return ArrayList(
+            (0 until parts).map { index ->
+                PendingIntent.getBroadcast(
+                    context,
+                    (sendId.hashCode() and 0xFFFF) * 100 + index,
+                    Intent(context, SmsDeliveryReceiver::class.java)
+                        .putExtra(SmsDeliveryReceiver.EXTRA_TAG, tag)
+                        .putExtra(SmsDeliveryReceiver.EXTRA_SEND_ID, sendId)
+                        .putExtra(SmsDeliveryReceiver.EXTRA_PARTS, parts),
+                    PendingIntent.FLAG_ONE_SHOT or mutable,
+                )
+            },
+        )
     }
 }

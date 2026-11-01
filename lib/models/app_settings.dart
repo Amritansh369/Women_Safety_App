@@ -1,3 +1,13 @@
+/// Languages SMS alerts can be written in, by code.
+const alertLanguages = {
+  'en': 'English',
+  'hi': 'हिन्दी (Hindi)',
+  'bn': 'বাংলা (Bengali)',
+  'mr': 'मराठी (Marathi)',
+  'ta': 'தமிழ் (Tamil)',
+  'te': 'తెలుగు (Telugu)',
+};
+
 /// User-tunable safety behaviour, persisted by [StorageService].
 class AppSettings {
   final int countdownSeconds;
@@ -7,6 +17,8 @@ class AppSettings {
   final int updateIntervalMinutes;
   final String emergencyNumber;
   final String customMessage;
+  final String language;
+  final bool quickSos; // keep an SOS button in the notification shade
 
   const AppSettings({
     this.countdownSeconds = 5,
@@ -16,6 +28,8 @@ class AppSettings {
     this.updateIntervalMinutes = 5,
     this.emergencyNumber = '112',
     this.customMessage = '',
+    this.language = 'en',
+    this.quickSos = false,
   });
 
   AppSettings copyWith({
@@ -26,6 +40,8 @@ class AppSettings {
     int? updateIntervalMinutes,
     String? emergencyNumber,
     String? customMessage,
+    String? language,
+    bool? quickSos,
   }) {
     return AppSettings(
       countdownSeconds: countdownSeconds ?? this.countdownSeconds,
@@ -36,6 +52,8 @@ class AppSettings {
           updateIntervalMinutes ?? this.updateIntervalMinutes,
       emergencyNumber: emergencyNumber ?? this.emergencyNumber,
       customMessage: customMessage ?? this.customMessage,
+      language: language ?? this.language,
+      quickSos: quickSos ?? this.quickSos,
     );
   }
 
@@ -47,6 +65,8 @@ class AppSettings {
         'updateIntervalMinutes': updateIntervalMinutes,
         'emergencyNumber': emergencyNumber,
         'customMessage': customMessage,
+        'language': language,
+        'quickSos': quickSos,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -62,6 +82,8 @@ class AppSettings {
       emergencyNumber:
           json['emergencyNumber'] as String? ?? defaults.emergencyNumber,
       customMessage: json['customMessage'] as String? ?? defaults.customMessage,
+      language: json['language'] as String? ?? defaults.language,
+      quickSos: json['quickSos'] as bool? ?? defaults.quickSos,
     );
   }
 }

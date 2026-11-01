@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/app_settings.dart';
+import '../services/device_events.dart';
 import '../services/shake_service.dart';
 import '../services/storage_service.dart';
+import '../strings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -33,6 +36,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _settings = settings);
     await _storage.saveSettings(settings);
     await ShakeService.instance.sync();
+  }
+
+  Future<void> _setQuickSos(bool enabled) async {
+    if (enabled) await Permission.notification.request();
+    await _update(_settings!.copyWith(quickSos: enabled));
+    await DeviceEvents.setQuickSos(enabled);
   }
 
   @override
@@ -120,8 +129,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             _update(settings.copyWith(guardianMode: value))
                         : null,
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('SOS button in notifications'),
+                    subtitle: const Text(
+                      'Reach SOS from the lock screen. You can also add the '
+                      'SafeHer SOS tile to Quick Settings, or its widget to '
+                      'your home screen. All of them start the countdown.',
+                    ),
+                    value: settings.quickSos,
+                    onChanged: _setQuickSos,
+                  ),
                   const SizedBox(height: 12),
                   const _Heading('Your alert'),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Alert language'),
+                    subtitle: const Text(
+                      'Outside English, each SMS part holds 70 characters, so '
+                      'an alert can cost several SMS. Hindi also changes the '
+                      'SOS screens.',
+                    ),
+                    trailing: DropdownButton<String>(
+                      value: settings.language,
+                      items: [
+                        for (final entry in alertLanguages.entries)
+                          DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        appLanguage = value ?? 'en';
+                        _update(settings.copyWith(language: value));
+                      },
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _messageCtrl,

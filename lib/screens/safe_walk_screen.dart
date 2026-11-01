@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import '../app_info.dart';
 import '../services/safe_walk_controller.dart';
 import '../theme.dart';
 import '../widgets/custom_time_dialog.dart';
+import 'pick_place_screen.dart';
 
 /// Start a timed journey. If the user doesn't check in, the SOS sends itself.
 class SafeWalkScreen extends StatefulWidget {
@@ -19,6 +21,7 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
   final _destinationCtrl = TextEditingController();
   int _minutes = 15;
   bool _notifyContacts = true;
+  LatLng? _arrivalPoint;
 
   @override
   void dispose() {
@@ -54,6 +57,14 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
           : Duration(minutes: _minutes),
     );
     if (picked != null) setState(() => _minutes = picked.inMinutes);
+  }
+
+  Future<void> _pickArrivalPoint() async {
+    final picked = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(builder: (_) => PickPlaceScreen(initial: _arrivalPoint)),
+    );
+    if (picked != null) setState(() => _arrivalPoint = picked);
   }
 
   Widget _setup() {
@@ -105,6 +116,28 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
           ],
         ),
         const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.flag_outlined),
+          title: Text(
+            _arrivalPoint == null ? 'Arrival point (optional)' : 'Arrival point set',
+          ),
+          subtitle: Text(
+            _arrivalPoint == null
+                ? 'Pick it on a map and the walk ends by itself when you get '
+                    'there.'
+                : "The walk ends about 30 seconds after you reach it, and your "
+                    'contacts are told.',
+          ),
+          trailing: _arrivalPoint == null
+              ? const Icon(Icons.chevron_right)
+              : IconButton(
+                  tooltip: 'Remove arrival point',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => setState(() => _arrivalPoint = null),
+                ),
+          onTap: _pickArrivalPoint,
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           value: _notifyContacts,
@@ -118,6 +151,7 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
             duration: Duration(minutes: _minutes),
             destination: _destinationCtrl.text.trim(),
             notifyContacts: _notifyContacts,
+            arrivalPoint: _arrivalPoint,
           ),
           icon: const Icon(Icons.directions_walk),
           label: const Text('Start Safe Walk'),
@@ -152,6 +186,14 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
             ),
           ),
           Text('Due at ${DateFormat('HH:mm').format(_walk.deadline!)}'),
+          if (_walk.detectsArrival)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Ends by itself at your arrival point',
+                textAlign: TextAlign.center,
+              ),
+            ),
           const Spacer(),
           ElevatedButton.icon(
             onPressed: _walk.finish,

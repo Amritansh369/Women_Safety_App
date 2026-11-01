@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/incident.dart';
 import '../services/emergency_controller.dart';
 import '../services/sos_service.dart';
+import '../strings.dart';
 import '../theme.dart';
 import '../widgets/hold_button.dart';
 import '../widgets/live_map.dart';
@@ -54,9 +55,9 @@ class _CountdownState extends State<_Countdown> {
           child: Column(
             children: [
               const Spacer(),
-              const Text(
-                'Sending SOS in',
-                style: TextStyle(color: Colors.white, fontSize: 22),
+              Text(
+                tr('Sending SOS in'),
+                style: const TextStyle(color: Colors.white, fontSize: 22),
               ),
               const SizedBox(height: 12),
               Semantics(
@@ -71,10 +72,10 @@ class _CountdownState extends State<_Countdown> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Your location will go to your trusted contacts.',
+              Text(
+                tr('Your location will go to your trusted contacts.'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
               const Spacer(),
               ElevatedButton(
@@ -84,7 +85,7 @@ class _CountdownState extends State<_Countdown> {
                   foregroundColor: AppColors.sosRed,
                   minimumSize: const Size(double.infinity, 64),
                 ),
-                child: const Text('Cancel', style: TextStyle(fontSize: 20)),
+                child: Text(tr('Cancel'), style: const TextStyle(fontSize: 20)),
               ),
               const SizedBox(height: 12),
               TextButton(
@@ -93,7 +94,7 @@ class _CountdownState extends State<_Countdown> {
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 48),
                 ),
-                child: const Text('Send now'),
+                child: Text(tr('Send now')),
               ),
             ],
           ),
@@ -128,7 +129,9 @@ class _Active extends StatelessWidget {
                       onPressed: () => callNumber(controller.emergencyNumber),
                       icon: const Icon(Icons.call, size: 26),
                       label: Text(
-                        'Call ${controller.emergencyNumber}',
+                        tr('Call {number}', {
+                          'number': controller.emergencyNumber,
+                        }),
                         style: const TextStyle(fontSize: 20),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -145,7 +148,7 @@ class _Active extends StatelessWidget {
                           icon: controller.sirenOn
                               ? Icons.volume_off
                               : Icons.campaign,
-                          label: controller.sirenOn ? 'Stop siren' : 'Siren',
+                          label: tr(controller.sirenOn ? 'Stop siren' : 'Siren'),
                           onPressed: controller.toggleSiren,
                         ),
                       ),
@@ -153,7 +156,7 @@ class _Active extends StatelessWidget {
                       Expanded(
                         child: _DarkButton(
                           icon: Icons.near_me,
-                          label: 'Send location',
+                          label: tr('Send location'),
                           onPressed: () => _sendLocation(context),
                         ),
                       ),
@@ -175,10 +178,10 @@ class _Active extends StatelessWidget {
                       color: AppColors.success,
                       semanticLabel: "I'm safe. End SOS and tell my contacts",
                       onConfirmed: controller.markSafe,
-                      child: const Text(
-                        "HOLD:\nI'M SAFE",
+                      child: Text(
+                        tr("HOLD:\nI'M SAFE"),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
@@ -199,15 +202,17 @@ class _Active extends StatelessWidget {
     final fix = controller.fix;
     if (reached > 0) {
       await controller.sendUpdate();
-      messenger.showSnackBar(const SnackBar(content: Text('Update sent')));
-    } else if (fix != null) {
+      messenger.showSnackBar(SnackBar(content: Text(tr('Update sent'))));
+    }
+    if (await controller.sendManualUpdate() || reached > 0) return;
+    if (fix != null) {
       await launchUrl(
         Uri.parse(fix.mapsLink),
         mode: LaunchMode.externalApplication,
       );
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Still waiting for a GPS fix')),
+        SnackBar(content: Text(tr('Still waiting for a GPS fix'))),
       );
     }
   }
@@ -223,24 +228,30 @@ class _Headline extends StatelessWidget {
     final sent = incident.countWhere(AlertStatus.sent);
     final composer = incident.countWhere(AlertStatus.composer);
     final total = incident.alerts.length;
+    final number = controller.emergencyNumber;
     final String title;
     final String subtitle;
     if (total == 0) {
-      title = 'No contacts to alert';
-      subtitle = 'Call ${controller.emergencyNumber} now.';
+      title = tr('No contacts to alert');
+      subtitle = tr('Call {number} now.', {'number': number});
     } else if (controller.dispatching) {
-      title = 'Sending your SOS...';
-      subtitle = 'Getting your location and alerting your contacts.';
+      title = tr('Sending your SOS...');
+      subtitle = tr('Getting your location and alerting your contacts.');
     } else if (composer > 0) {
-      title = 'Press send in your messages app';
-      subtitle = 'The alert is written but has NOT been sent yet.';
+      title = tr('Press send in your messages app');
+      subtitle = tr('The alert is written but has NOT been sent yet.');
     } else if (sent == 0) {
-      title = 'SOS not sent yet';
-      subtitle = 'No signal? Retrying automatically. '
-          'Calling ${controller.emergencyNumber} may still work.';
+      title = tr('SOS not sent yet');
+      subtitle = tr(
+        'No signal? Retrying automatically. Calling {number} may still work.',
+        {'number': number},
+      );
     } else {
-      title = 'SOS sent to $sent of $total';
-      subtitle = "Location updates will continue until you're safe.";
+      title = tr('SOS sent to {sent} of {total}', {
+        'sent': sent,
+        'total': total,
+      });
+      subtitle = tr("Location updates will continue until you're safe.");
     }
     return Semantics(
       liveRegion: true,
@@ -316,7 +327,9 @@ class _StatusCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Heading to ${incident.destination}',
+                      tr('Heading to {place}', {
+                        'place': incident.destination,
+                      }),
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -337,7 +350,7 @@ class _StatusCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    _statusLabel(alert.status),
+                    _statusLabel(alert),
                     style: const TextStyle(color: Colors.white),
                   ),
                   const SizedBox(width: 4),
@@ -358,7 +371,7 @@ class _StatusCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: _DarkButton(
                 icon: Icons.refresh,
-                label: 'Retry $failed failed',
+                label: tr('Retry {count} failed', {'count': failed}),
                 onPressed: controller.retryFailed,
               ),
             ),
@@ -366,7 +379,17 @@ class _StatusCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '${incident.updatesSent} location update(s) sent',
+                tr('{count} location update(s) sent', {
+                  'count': incident.updatesSent,
+                }),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          if (incident.countWhere(AlertStatus.composer) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                tr('To update contacts marked "Press send", tap Send location.'),
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -375,13 +398,13 @@ class _StatusCard extends StatelessWidget {
     );
   }
 
-  String _statusLabel(AlertStatus status) => switch (status) {
+  String _statusLabel(ContactAlert alert) => tr(switch (alert.status) {
         AlertStatus.pending => 'Waiting',
         AlertStatus.sending => 'Sending',
-        AlertStatus.sent => 'Sent',
+        AlertStatus.sent => alert.delivered ? 'Delivered' : 'Sent',
         AlertStatus.composer => 'Press send',
         AlertStatus.failed => 'Failed',
-      };
+      });
 }
 
 class _StatusIcon extends StatelessWidget {

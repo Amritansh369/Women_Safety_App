@@ -19,9 +19,20 @@ class FakeSms implements SmsGateway {
   final delays = <String, Duration>{};
   SmsResult? alwaysReturn;
   bool composerOpens = true;
+  final deliveryTags = <String>[];
+  final composerMessages = <String>[];
+  final deliveryReports = StreamController<String>.broadcast();
 
   @override
-  Future<SmsResult> send(String phone, String message) async {
+  Stream<String> get deliveries => deliveryReports.stream;
+
+  @override
+  Future<SmsResult> send(
+    String phone,
+    String message, {
+    String? deliveryTag,
+  }) async {
+    if (deliveryTag != null) deliveryTags.add(deliveryTag);
     attempts[phone] = (attempts[phone] ?? 0) + 1;
     final delay = delays[phone];
     if (delay != null) await Future<void>.delayed(delay);
@@ -38,6 +49,7 @@ class FakeSms implements SmsGateway {
   @override
   Future<bool> openComposer(List<String> phones, String message) async {
     composerCalls.add(phones);
+    composerMessages.add(message);
     return composerOpens;
   }
 }

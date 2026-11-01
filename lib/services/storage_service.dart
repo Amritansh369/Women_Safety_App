@@ -18,6 +18,7 @@ class StorageService {
   static const _activeIncidentKey = 'active_incident';
   static const _walkKey = 'safe_walk';
   static const _setupSeenKey = 'setup_seen';
+  static const _nearbyKey = 'nearby_places';
   static const _maxIncidents = 50;
 
   Future<List<EmergencyContact>> getContacts() async {
@@ -129,6 +130,11 @@ class StorageService {
       await _writeJson(_walkKey, walk);
     }
   }
+
+  Future<Map<String, dynamic>?> getNearby() => _readJson(_nearbyKey);
+
+  Future<void> saveNearby(Map<String, dynamic> nearby) =>
+      _writeJson(_nearbyKey, nearby);
 
   Future<bool> isSetupSeen() async {
     final prefs = await SharedPreferences.getInstance();

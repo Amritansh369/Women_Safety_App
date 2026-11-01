@@ -107,7 +107,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
     if (confirmed != true) return;
     final profile = await _storage.getProfile();
-    final message = SosMessages.test(profile['name'] ?? '');
+    final settings = await _storage.getSettings();
+    final message = SosMessages.test(
+      profile['name'] ?? '',
+      language: settings.language,
+    );
     final result = await _sms.send(contact.phone, message);
     final text = switch (result) {
       SmsResult.sent => 'Test sent to ${contact.name}',

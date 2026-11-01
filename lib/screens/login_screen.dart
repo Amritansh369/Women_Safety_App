@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../app_info.dart';
+import '../models/incident.dart';
 import '../services/auth_service.dart';
+import '../services/emergency_controller.dart';
 import '../services/sos_service.dart';
+import '../strings.dart';
 import '../theme.dart';
+import '../widgets/hold_button.dart';
 import 'home_screen.dart';
 
-/// Sign up on first use, log in afterwards. The session persists, so this
-/// screen never stands between a logged-in user and the SOS button.
+/// Sign up on first use, log in afterwards. Being logged out must never stand
+/// between the user and help, so the SOS is available here too.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -209,6 +213,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text('Forgot password?'),
                     ),
                   // Logged out or not, help must stay one tap away.
+                  const SizedBox(height: 8),
+                  HoldButton(
+                    size: 96,
+                    color: AppColors.sosRed,
+                    semanticLabel: 'Start SOS countdown',
+                    onConfirmed: () => EmergencyController.instance
+                        .startCountdown(IncidentTrigger.button),
+                    child: const Text(
+                      'SOS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(tr('Hold for SOS'), style: TextStyle(color: muted)),
                   TextButton.icon(
                     onPressed: () => callNumber('112'),
                     icon: const Icon(Icons.call, color: AppColors.sosRed),

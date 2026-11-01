@@ -100,10 +100,12 @@ class _IncidentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final started = DateFormat('d MMM yyyy, HH:mm').format(incident.startedAt);
     final sent = incident.countWhere(AlertStatus.sent);
+    final delivered = incident.alerts.where((a) => a.delivered).length;
     final via = switch (incident.trigger) {
       IncidentTrigger.button => 'SOS button',
       IncidentTrigger.shake => 'Shake',
       IncidentTrigger.safeWalk => 'Missed Safe Walk check-in',
+      IncidentTrigger.shortcut => 'Quick Settings, widget or notification',
     };
     final heading = incident.destination.isEmpty
         ? ''
@@ -118,7 +120,8 @@ class _IncidentCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          '$via. Sent to $sent of ${incident.alerts.length} contact(s).$heading',
+          '$via. Sent to $sent of ${incident.alerts.length} contact(s)'
+          '${delivered > 0 ? ', $delivered confirmed delivered' : ''}.$heading',
         ),
         trailing: latitude == null || longitude == null
             ? null

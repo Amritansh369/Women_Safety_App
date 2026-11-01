@@ -66,6 +66,7 @@ class EmergencyController extends ChangeNotifier {
   Timer? _updates;
   Timer? _autoRetry;
   StreamSubscription<LocationFix>? _fixSubscription;
+  StreamSubscription<String>? _deliverySubscription;
 
   EmergencyPhase get phase => _phase;
   int get secondsLeft => _secondsLeft;
@@ -177,6 +178,7 @@ class EmergencyController extends ChangeNotifier {
         destination: _incident?.destination ?? '',
         fix: fix,
         now: clock.now(),
+        language: _settings.language,
       );
 
   /// Prefers a fresh fix, but gives up after [firstFixTimeout]: a late alert
@@ -192,6 +194,7 @@ class EmergencyController extends ChangeNotifier {
   }
 
   void _startMonitoring() {
+    _deliverySubscription = _sms.deliveries.listen(_onDelivered);
     try {
       _fixSubscription = _location.fixes.listen(_onFix);
       _location.hold(_holdReason, background: true);
@@ -228,6 +231,19 @@ class EmergencyController extends ChangeNotifier {
     _incident?.longitude = fix.longitude;
   }
 
+  String _deliveryTag(Incident incident, String phone) =>
+      '${incident.id}|$phone';
+
+  void _onDelivered(String tag) {
+    final incident = _incident;
+    if (incident == null) return;
+    for (final alert in incident.alerts) {
+      if (_deliveryTag(incident, alert.phone) == tag) alert.delivered = true;
+    }
+    unawaited(_persist());
+    notifyListeners();
+  }
+
   /// Sends [message] to [alerts] concurrently so one slow number can't delay
   /// the others, then hands anything that can't be sent directly to the composer.
   Future<void> _dispatch(List<ContactAlert> alerts, String message) async {
@@ -235,7 +251,11 @@ class EmergencyController extends ChangeNotifier {
     await Future.wait(alerts.map((alert) async {
       alert.status = AlertStatus.sending;
       notifyListeners();
-      final result = await _sendWithRetry(alert.phone, message);
+      final result = await _sendWithRetry(
+        alert.phone,
+        message,
+        deliveryTag: _deliveryTag(_incident!, alert.phone),
+      );
       if (result == SmsResult.sent) {
         alert.status = AlertStatus.sent;
       } else if (result == SmsResult.failed) {
@@ -259,12 +279,16 @@ class EmergencyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<SmsResult> _sendWithRetry(String phone, String message) async {
+  Future<SmsResult> _sendWithRetry(
+    String phone,
+    String message, {
+    String? deliveryTag,
+  }) async {
     var result = SmsResult.failed;
     for (var attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) await Future<void>.delayed(retryDelay);
       try {
-        result = await _sms.send(phone, message);
+        result = await _sms.send(phone, message, deliveryTag: deliveryTag);
       } catch (e) {
         debugPrint('SMS send threw: $e');
         result = SmsResult.failed;
@@ -286,12 +310,32 @@ class EmergencyController extends ChangeNotifier {
     if (_fix == null || !_fix!.isFresh(clock.now())) {
       _rememberFix(await _location.currentFix(firstFixTimeout));
     }
-    final message = SosMessages.update(fix: _fix, now: clock.now());
+    final message = _updateMessage();
     await Future.wait(reached.map((a) => _sendWithRetry(a.phone, message)));
     incident.updatesSent++;
     await _persist();
     notifyListeners();
   }
+
+  String _updateMessage() => SosMessages.update(
+        fix: _fix,
+        now: clock.now(),
+        language: _settings.language,
+      );
+
+  /// Contacts reached through the messaging app can't be updated automatically,
+  /// and opening it unprompted would take over the screen mid-emergency, so
+  /// this only runs when the user asks for it.
+  Future<bool> sendManualUpdate() async {
+    final phones = _composerPhones();
+    if (phones.isEmpty) return false;
+    return _sms.openComposer(phones, _updateMessage());
+  }
+
+  List<String> _composerPhones() => (_incident?.alerts ?? const <ContactAlert>[])
+      .where((a) => a.status == AlertStatus.composer)
+      .map((a) => a.phone)
+      .toList();
 
   /// Tries again for contacts the alert did not reach.
   Future<void> retryFailed() async {
@@ -327,8 +371,15 @@ class EmergencyController extends ChangeNotifier {
 
     final reached =
         incident.alerts.where((a) => a.status == AlertStatus.sent).toList();
-    final message = SosMessages.allClear(_profile['name'] ?? '');
+    final message = SosMessages.allClear(
+      _profile['name'] ?? '',
+      language: _settings.language,
+    );
     await Future.wait(reached.map((a) => _sendWithRetry(a.phone, message)));
+    final composerPhones = _composerPhones();
+    if (composerPhones.isNotEmpty) {
+      await _sms.openComposer(composerPhones, message);
+    }
 
     incident.endedAt = clock.now();
     try {
@@ -365,6 +416,8 @@ class EmergencyController extends ChangeNotifier {
     _autoRetry?.cancel();
     _fixSubscription?.cancel();
     _fixSubscription = null;
+    _deliverySubscription?.cancel();
+    _deliverySubscription = null;
     _location.release(_holdReason);
   }
 

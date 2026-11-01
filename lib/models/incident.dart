@@ -1,4 +1,4 @@
-enum IncidentTrigger { button, shake, safeWalk }
+enum IncidentTrigger { button, shake, safeWalk, shortcut }
 
 /// What we actually know about an alert to one contact. `composer` means the
 /// messaging app was opened: the user still had to press send, so it must
@@ -11,11 +11,16 @@ class ContactAlert {
   final String phone;
   AlertStatus status;
 
+  /// The phone network confirmed the message reached their handset. Staying
+  /// false proves nothing: many carriers never send these reports.
+  bool delivered;
+
   ContactAlert({
     required this.contactId,
     required this.name,
     required this.phone,
     this.status = AlertStatus.pending,
+    this.delivered = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -23,6 +28,7 @@ class ContactAlert {
         'name': name,
         'phone': phone,
         'status': status.name,
+        'delivered': delivered,
       };
 
   factory ContactAlert.fromJson(Map<String, dynamic> json) {
@@ -31,6 +37,7 @@ class ContactAlert {
       name: json['name'] as String,
       phone: json['phone'] as String,
       status: AlertStatus.values.byName(json['status'] as String),
+      delivered: json['delivered'] as bool? ?? false,
     );
   }
 }
