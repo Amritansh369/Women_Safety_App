@@ -58,6 +58,21 @@ void main() {
       expect(message, isNot(contains('Blood group')));
     });
 
+    test('names the app and places the destination after the location', () {
+      final message = SosMessages.alert(
+        name: 'Priya',
+        fix: fix,
+        now: now,
+        bloodGroup: 'O+',
+        destination: ' MG Road Metro ',
+      );
+      expect(
+        message,
+        endsWith('22:15). Was heading to MG Road Metro. Blood group O+. '
+            'Please call them. Sent by SafeHer.'),
+      );
+    });
+
     test('uses the custom message when there is one', () {
       final message = SosMessages.alert(
         name: 'Priya',

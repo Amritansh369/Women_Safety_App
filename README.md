@@ -10,7 +10,7 @@ SMS gateway: everything runs on the phone, using GPS and the SIM's own SMS.
 | **SOS** | Press and hold, or shake. After a cancellable countdown, your location goes to every trusted contact by SMS, with no further taps on Android |
 | **Honest status** | Shows per contact whether the network accepted the alert, with retry. Never says "sent" unless it was |
 | **Live updates** | While an SOS runs, location updates continue by SMS with the screen off, until you hold "I'm safe", which also tells your contacts |
-| **Safe Walk** | Set a time for a journey. Miss it, ignore the loud check-in, and the SOS fires by itself |
+| **Safe Walk** | Set a time for a journey. Miss it, ignore the loud check-in, and the SOS fires by itself and says where you were going |
 | **Fake Call** | A realistic incoming call to help you leave an uncomfortable situation |
 | **Siren** | Loud alarm on the alarm stream. Off by default, because it isn't safe in every situation |
 | **Live Location** | In-app OpenStreetMap view, with sharing through any app |
@@ -75,6 +75,16 @@ flutter pub get
 flutter test
 flutter run
 ```
+
+## Building for Android and iOS
+
+- **Android:** run `flutter build apk --release` on any PC.
+- **iOS:** this needs a Mac. `.github/workflows/build.yml` builds both platforms
+  on GitHub, and its iOS result is unsigned. To install on an iPhone, open
+  `ios/Runner.xcworkspace` in Xcode on a Mac, set your Team and a unique bundle
+  ID under Signing & Capabilities, then run it on the phone. A free Apple ID
+  works for your own phone, with the app expiring after 7 days. Sharing it needs
+  the $99 per year Apple Developer Program.
 
 ## Limits to know about
 

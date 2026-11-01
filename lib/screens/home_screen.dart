@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_info.dart';
 import '../models/incident.dart';
 import '../services/emergency_controller.dart';
 import '../services/readiness_service.dart';
@@ -81,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final firstName = _name.trim().split(' ').first;
     return Scaffold(
       appBar: AppBar(
-        title: Text(firstName.isEmpty ? 'SafeHer' : 'Hi, $firstName'),
+        title: Text(firstName.isEmpty ? appName : 'Hi, $firstName'),
         actions: [
           IconButton(
             tooltip: 'Profile and settings',

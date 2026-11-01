@@ -89,7 +89,10 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                     done: state.locationGranted,
                     detail: 'So your alert can say where you are.',
                     action: 'Allow',
-                    onFix: () => _request(Permission.locationWhenInUse),
+                    onFix: () async {
+                      await _service.requestLocation();
+                      await _refresh();
+                    },
                   ),
                   _Step(
                     icon: Icons.gps_fixed,
@@ -110,15 +113,31 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                           'touch your phone. Standard SMS rates apply.',
                       action: 'Allow',
                       onFix: () => _request(Permission.sms),
+                    )
+                  else
+                    const Card(
+                      child: ListTile(
+                        leading: Icon(Icons.info_outline),
+                        title: Text(
+                          'On iPhone, you must press Send',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          'Apple does not let apps send SMS by themselves. '
+                          'SOS opens Messages with your alert ready to send.',
+                        ),
+                      ),
                     ),
-                  _Step(
-                    icon: Icons.notifications,
-                    title: 'Notifications',
-                    done: state.notificationsGranted,
-                    detail: 'Shows that protection is running in the background.',
-                    action: 'Allow',
-                    onFix: () => _request(Permission.notification),
-                  ),
+                  if (state.needsNotifications)
+                    _Step(
+                      icon: Icons.notifications,
+                      title: 'Notifications',
+                      done: state.notificationsGranted,
+                      detail:
+                          'Shows that protection is running in the background.',
+                      action: 'Allow',
+                      onFix: () => _request(Permission.notification),
+                    ),
                 ],
               ),
       ),

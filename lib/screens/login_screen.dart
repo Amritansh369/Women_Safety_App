@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_info.dart';
 import '../services/auth_service.dart';
 import '../services/sos_service.dart';
 import '../theme.dart';
@@ -130,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 18),
                   const Text(
-                    'SafeHer',
+                    appName,
                     style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 6),

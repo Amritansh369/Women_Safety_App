@@ -22,12 +22,16 @@ class Readiness {
   /// Android-only: iOS has no automatic SMS to enable.
   bool get canAutoSend => Platform.isAndroid;
 
+  /// Android-only: iOS shows its own location indicator, and the app posts no
+  /// notifications there.
+  bool get needsNotifications => Platform.isAndroid;
+
   int get missing => [
         contacts > 0,
         locationGranted,
         locationServiceOn,
         !canAutoSend || smsGranted,
-        notificationsGranted,
+        !needsNotifications || notificationsGranted,
       ].where((ok) => !ok).length;
 
   bool get allGood => missing == 0;
@@ -38,14 +42,29 @@ class ReadinessService {
 
   Future<Readiness> check() async {
     final contacts = await _storage.getContacts();
+    final location = await Geolocator.checkPermission();
     return Readiness(
       contacts: contacts.length,
-      locationGranted: await Permission.locationWhenInUse.isGranted,
+      locationGranted: _isGranted(location),
       locationServiceOn: await Geolocator.isLocationServiceEnabled(),
       smsGranted: Platform.isAndroid && await Permission.sms.isGranted,
-      notificationsGranted: await Permission.notification.isGranted,
+      notificationsGranted:
+          Platform.isAndroid && await Permission.notification.isGranted,
     );
   }
+
+  /// Uses Geolocator rather than permission_handler, which reports location as
+  /// denied on iOS unless the build enables it with extra configuration.
+  Future<void> requestLocation() async {
+    final permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+    }
+  }
+
+  bool _isGranted(LocationPermission permission) =>
+      permission == LocationPermission.whileInUse ||
+      permission == LocationPermission.always;
 
   /// Asks for [permission], or sends the user to system settings if Android
   /// will no longer show the prompt.

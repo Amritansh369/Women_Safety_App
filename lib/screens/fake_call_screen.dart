@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/siren_service.dart';
+import '../widgets/custom_time_dialog.dart';
 
 /// Schedules a convincing incoming call: a polite way out of an uncomfortable
 /// situation before it becomes an emergency.
@@ -23,6 +24,22 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
     _timer?.cancel();
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCustomTime() async {
+    final picked = await showCustomTimeDialog(
+      context,
+      title: 'Ring in',
+      largeLabel: 'Minutes',
+      smallLabel: 'Seconds',
+      largeUnit: const Duration(minutes: 1),
+      smallUnit: const Duration(seconds: 1),
+      max: const Duration(hours: 1),
+      initial: _delays.containsValue(_delay)
+          ? null
+          : Duration(seconds: _delay),
+    );
+    if (picked != null) setState(() => _delay = picked.inSeconds);
   }
 
   void _schedule() {
@@ -81,6 +98,16 @@ class _FakeCallScreenState extends State<FakeCallScreen> {
                     selected: _delay == entry.value,
                     onSelected: (_) => setState(() => _delay = entry.value),
                   ),
+                ChoiceChip(
+                  avatar: const Icon(Icons.edit, size: 18),
+                  label: Text(
+                    _delays.containsValue(_delay)
+                        ? 'Custom'
+                        : shortDuration(Duration(seconds: _delay)),
+                  ),
+                  selected: !_delays.containsValue(_delay),
+                  onSelected: (_) => _pickCustomTime(),
+                ),
               ],
             ),
             const SizedBox(height: 24),

@@ -83,7 +83,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   /// Proves the setup works before it's needed, and lets contacts know why
-  /// they might hear from SafeHer.
+  /// they might hear from the app.
   Future<void> _sendTest(EmergencyContact contact) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Central color palette & theme for SafeHer.
 class AppColors {
-  static const primary = Color(0xFF8E2157);   // SafeHer plum - calm, trustworthy brand color
+  static const primary = Color(0xFF8E2157);   // brand plum - calm, trustworthy brand color
   static const primaryDark = Color(0xFF5E1239);
   static const rose = Color(0xFFD9537F);      // warm secondary accent
   static const accent = Color(0xFF5B57D1);    // violet for location features

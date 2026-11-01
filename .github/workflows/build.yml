@@ -1,0 +1,56 @@
+# Tests the app and builds it for Android and iOS. iOS needs a Mac, so this also
+# lets the project compile for iPhone from a Windows PC. Run it from the Actions
+# tab, or by pushing to main. Download the results from the run's Artifacts.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.44.8'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safeher-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      # Proves the app compiles. The result is unsigned, so it can't be installed
+      # on an iPhone until it's signed with an Apple Developer account.
+      - run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        run: |
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr safeher-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safeher-ios-unsigned
+          path: safeher-unsigned.ipa

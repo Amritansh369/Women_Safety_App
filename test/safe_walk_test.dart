@@ -3,6 +3,7 @@ import 'package:clock/clock.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:women_safety_app/models/incident.dart';
 import 'package:women_safety_app/services/emergency_controller.dart';
 import 'package:women_safety_app/services/safe_walk_controller.dart';
 import 'package:women_safety_app/services/storage_service.dart';
@@ -97,6 +98,46 @@ void main() {
         expect(walk.phase, WalkPhase.idle);
         expect(emergency.phase, EmergencyPhase.active);
         expect(sms.sent.single.message, startsWith('SOS!'));
+        expect(sms.sent.single.message, contains('Was heading to Home.'));
+        expect(emergency.incident!.destination, 'Home');
+      }));
+
+  test('an SOS pressed during a walk says where they were going', () => run((async) {
+        startWalk(async);
+        async.elapse(const Duration(minutes: 2));
+        emergency.startCountdown(IncidentTrigger.button);
+        async.elapse(const Duration(seconds: 6));
+        expect(sms.sent.single.message, contains('Was heading to Home.'));
+      }));
+
+  test('a retried alert keeps the destination', () => run((async) {
+        sms.failuresLeft['+919800000001'] = 3;
+        startWalk(async);
+        async.elapse(const Duration(minutes: 11, seconds: 45));
+        expect(sms.sent.single.message, contains('Was heading to Home.'));
+      }));
+
+  test('the destination survives the app being killed', () => run((async) {
+        startWalk(async);
+        emergency.startCountdown(IncidentTrigger.button);
+        async.elapse(const Duration(seconds: 6));
+
+        final restarted = EmergencyController(
+          sms: sms,
+          location: location,
+          storage: StorageService(),
+          siren: FakeSiren(),
+        );
+        restarted.resumeIfActive();
+        async.elapse(const Duration(seconds: 1));
+        expect(restarted.incident!.destination, 'Home');
+      }));
+
+  test('no walk means no destination in the SOS', () => run((async) {
+        emergency.startCountdown(IncidentTrigger.button);
+        async.elapse(const Duration(seconds: 6));
+        expect(sms.sent.single.message, isNot(contains('heading')));
+        expect(emergency.incident!.destination, isEmpty);
       }));
 
   test('extending from the check-in gives more time', () => run((async) {

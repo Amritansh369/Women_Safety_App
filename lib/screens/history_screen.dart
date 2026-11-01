@@ -105,6 +105,9 @@ class _IncidentCard extends StatelessWidget {
       IncidentTrigger.shake => 'Shake',
       IncidentTrigger.safeWalk => 'Missed Safe Walk check-in',
     };
+    final heading = incident.destination.isEmpty
+        ? ''
+        : ' Heading to ${incident.destination}.';
     final latitude = incident.latitude;
     final longitude = incident.longitude;
     return Card(
@@ -115,7 +118,7 @@ class _IncidentCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          '$via. Sent to $sent of ${incident.alerts.length} contact(s).',
+          '$via. Sent to $sent of ${incident.alerts.length} contact(s).$heading',
         ),
         trailing: latitude == null || longitude == null
             ? null

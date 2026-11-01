@@ -131,8 +131,12 @@ class SafeWalkController extends ChangeNotifier {
   }
 
   Future<void> _escalate() async {
+    final destination = _destination;
     await finish();
-    await _emergency.triggerNow(IncidentTrigger.safeWalk);
+    await _emergency.triggerNow(
+      IncidentTrigger.safeWalk,
+      destination: destination,
+    );
   }
 
   Future<void> _notifyContacts() async {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../app_info.dart';
 import '../services/safe_walk_controller.dart';
 import '../theme.dart';
+import '../widgets/custom_time_dialog.dart';
 
 /// Start a timed journey. If the user doesn't check in, the SOS sends itself.
 class SafeWalkScreen extends StatefulWidget {
@@ -38,19 +40,37 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
     );
   }
 
+  Future<void> _pickCustomTime() async {
+    final picked = await showCustomTimeDialog(
+      context,
+      title: 'I should arrive within',
+      largeLabel: 'Hours',
+      smallLabel: 'Minutes',
+      largeUnit: const Duration(hours: 1),
+      smallUnit: const Duration(minutes: 1),
+      max: const Duration(hours: 8),
+      initial: _durations.contains(_minutes)
+          ? null
+          : Duration(minutes: _minutes),
+    );
+    if (picked != null) setState(() => _minutes = picked.inMinutes);
+  }
+
   Widget _setup() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const Text(
           "Going somewhere alone? Set a time. If you don't check in by then, "
-          'SafeHer asks if you are OK and, with no reply, sends your SOS.',
+          '$appName asks if you are OK and, with no reply, sends your SOS '
+          'with your location and where you were going.',
           style: TextStyle(fontSize: 16),
         ),
         const SizedBox(height: 20),
         TextField(
           controller: _destinationCtrl,
           textCapitalization: TextCapitalization.sentences,
+          maxLength: 60,
           decoration: const InputDecoration(
             labelText: 'Where are you going? (optional)',
             prefixIcon: Icon(Icons.place_outlined),
@@ -72,6 +92,16 @@ class _SafeWalkScreenState extends State<SafeWalkScreen> {
                 selected: _minutes == minutes,
                 onSelected: (_) => setState(() => _minutes = minutes),
               ),
+            ChoiceChip(
+              avatar: const Icon(Icons.edit, size: 18),
+              label: Text(
+                _durations.contains(_minutes)
+                    ? 'Custom'
+                    : shortDuration(Duration(minutes: _minutes)),
+              ),
+              selected: !_durations.contains(_minutes),
+              onSelected: (_) => _pickCustomTime(),
+            ),
           ],
         ),
         const SizedBox(height: 12),

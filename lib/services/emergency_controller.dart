@@ -55,6 +55,7 @@ class EmergencyController extends ChangeNotifier {
   EmergencyPhase _phase = EmergencyPhase.idle;
   int _secondsLeft = 0;
   IncidentTrigger _trigger = IncidentTrigger.button;
+  String? _destination;
   Incident? _incident;
   LocationFix? _fix;
   AppSettings _settings = const AppSettings();
@@ -110,10 +111,14 @@ class EmergencyController extends ChangeNotifier {
   }
 
   /// Skips the countdown: for a Safe Walk the user has already had a grace period.
-  Future<void> triggerNow(IncidentTrigger trigger) async {
+  Future<void> triggerNow(
+    IncidentTrigger trigger, {
+    String destination = '',
+  }) async {
     if (_phase == EmergencyPhase.active) return;
     _countdown?.cancel();
     _trigger = trigger;
+    _destination = destination;
     _settings = await _loadSettings();
     await _activate();
   }
@@ -132,10 +137,13 @@ class EmergencyController extends ChangeNotifier {
 
     final contacts = await _loadContacts();
     _profile = await _loadProfile();
+    final destination = _destination ?? await _loadWalkDestination();
+    _destination = null;
     final incident = Incident(
       id: clock.now().microsecondsSinceEpoch.toString(),
       startedAt: clock.now(),
       trigger: _trigger,
+      destination: destination,
       alerts: [
         for (final EmergencyContact c in contacts)
           ContactAlert(contactId: c.id, name: c.name, phone: c.phone),
@@ -149,16 +157,7 @@ class EmergencyController extends ChangeNotifier {
     final fix = await _bestAvailableFix();
     _rememberFix(fix);
     _needsFreshFix = fix == null || !fix.isFresh(clock.now());
-    await _dispatch(
-      incident.alerts,
-      SosMessages.alert(
-        name: _profile['name'] ?? '',
-        bloodGroup: _profile['bloodGroup'] ?? '',
-        customMessage: _settings.customMessage,
-        fix: fix,
-        now: clock.now(),
-      ),
-    );
+    await _dispatch(incident.alerts, _alertMessage(fix));
     _dispatching = false;
     notifyListeners();
 
@@ -170,6 +169,15 @@ class EmergencyController extends ChangeNotifier {
       await sendUpdate();
     }
   }
+
+  String _alertMessage(LocationFix? fix) => SosMessages.alert(
+        name: _profile['name'] ?? '',
+        bloodGroup: _profile['bloodGroup'] ?? '',
+        customMessage: _settings.customMessage,
+        destination: _incident?.destination ?? '',
+        fix: fix,
+        now: clock.now(),
+      );
 
   /// Prefers a fresh fix, but gives up after [firstFixTimeout]: a late alert
   /// is worse than one with an older position.
@@ -296,16 +304,7 @@ class EmergencyController extends ChangeNotifier {
     if (failed.isEmpty) return;
     _dispatching = true;
     notifyListeners();
-    await _dispatch(
-      failed,
-      SosMessages.alert(
-        name: _profile['name'] ?? '',
-        bloodGroup: _profile['bloodGroup'] ?? '',
-        customMessage: _settings.customMessage,
-        fix: _fix,
-        now: clock.now(),
-      ),
-    );
+    await _dispatch(failed, _alertMessage(_fix));
     _dispatching = false;
     notifyListeners();
   }
@@ -392,6 +391,18 @@ class EmergencyController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Sending SOS without profile: $e');
       return const {};
+    }
+  }
+
+  /// The destination of a Safe Walk that's still running, for an SOS raised
+  /// by hand during the walk.
+  Future<String> _loadWalkDestination() async {
+    try {
+      final walk = await _storage.getSafeWalk();
+      return walk?['destination'] as String? ?? '';
+    } catch (e) {
+      debugPrint('Sending SOS without destination: $e');
+      return '';
     }
   }
 

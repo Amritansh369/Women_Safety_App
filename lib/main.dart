@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_info.dart';
 import 'services/emergency_controller.dart';
 import 'services/safe_walk_controller.dart';
 import 'services/storage_service.dart';
@@ -21,7 +22,7 @@ class SafeHerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SafeHer',
+      title: appName,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       darkTheme: buildDarkTheme(),

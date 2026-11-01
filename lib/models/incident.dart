@@ -41,6 +41,7 @@ class Incident {
   final DateTime startedAt;
   final IncidentTrigger trigger;
   final List<ContactAlert> alerts;
+  final String destination; // where a Safe Walk was heading, if one was running
   DateTime? endedAt;
   double? latitude;
   double? longitude;
@@ -51,6 +52,7 @@ class Incident {
     required this.startedAt,
     required this.trigger,
     required this.alerts,
+    this.destination = '',
     this.endedAt,
     this.latitude,
     this.longitude,
@@ -66,6 +68,7 @@ class Incident {
         'endedAt': endedAt?.toIso8601String(),
         'trigger': trigger.name,
         'alerts': alerts.map((a) => a.toJson()).toList(),
+        'destination': destination,
         'latitude': latitude,
         'longitude': longitude,
         'updatesSent': updatesSent,
@@ -81,6 +84,7 @@ class Incident {
       alerts: (json['alerts'] as List)
           .map((a) => ContactAlert.fromJson(a as Map<String, dynamic>))
           .toList(),
+      destination: json['destination'] as String? ?? '',
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       updatesSent: json['updatesSent'] as int? ?? 0,
